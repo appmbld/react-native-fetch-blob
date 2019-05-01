@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Base64;
+import android.util.Log;
 
 import com.RNFetchBlob.Response.RNFetchBlobDefaultResp;
 import com.RNFetchBlob.Response.RNFetchBlobFileResp;
@@ -22,9 +23,10 @@ import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
-import com.facebook.react.modules.network.OkHttpClientProvider;
 import com.facebook.react.modules.network.TLSSocketFactory;
 
+
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -42,6 +44,8 @@ import java.util.List;
 import java.util.HashMap;
 
 import java.util.concurrent.TimeUnit;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import okhttp3.Call;
 import okhttp3.ConnectionPool;
@@ -324,20 +328,22 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                 public Response intercept(Chain chain) throws IOException {
                     try {
                         Response originalResponse = chain.proceed(req);
+                        ResponseBody modifiedResponse = getUncompressedResponseIfNeeded(originalResponse);
+
                         ResponseBody extended;
                         switch (responseType) {
                             case KeepInMemory:
                                 extended = new RNFetchBlobDefaultResp(
                                         RNFetchBlob.RCTContext,
                                         taskId,
-                                        originalResponse.body(),
+                                        modifiedResponse,
                                         options.increment);
                                 break;
                             case FileStorage:
                                 extended = new RNFetchBlobFileResp(
                                         RNFetchBlob.RCTContext,
                                         taskId,
-                                        originalResponse.body(),
+                                        modifiedResponse,
                                         destPath,
                                         options.overwrite);
                                 break;
@@ -345,7 +351,7 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                                 extended = new RNFetchBlobDefaultResp(
                                         RNFetchBlob.RCTContext,
                                         taskId,
-                                        originalResponse.body(),
+                                        modifiedResponse,
                                         options.increment);
                                 break;
                         }
@@ -358,7 +364,7 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                         timeout = true;
                         RNFetchBlobUtils.emitWarningEvent("RNFetchBlob error when sending request : " + e.getLocalizedMessage());
                     } catch(Exception ex) {
-
+                        Log.e("RNFetchBlob error", ex.getLocalizedMessage());
                     }
                     return chain.proceed(chain.request());
                 }
@@ -430,6 +436,34 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
             releaseTaskResource();
             callback.invoke("RNFetchBlob request error: " + error.getMessage() + error.getCause());
         }
+    }
+
+    /**
+     * Inflates the response body to full size if the Content-Encoding set to "deflate"
+     * "gzip" Content-Encoding is handled by okhttp3
+     */
+    private ResponseBody getUncompressedResponseIfNeeded(Response response) {
+        ResponseBody originalRespBody = response.body();
+        if (response.header("Content-Encoding", "").equalsIgnoreCase("deflate")) {
+            String originalContent = response.header("Content-Type", "");
+            MediaType contentType = originalContent.equals("") ? null : MediaType.get(originalContent);
+
+            InputStream inputStream = new InflaterInputStream(originalRespBody.byteStream(), new Inflater(true));
+            ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+
+            try {
+                int read = inputStream.read();
+                while (read != -1) {
+                    outStream.write(read);
+                    read = inputStream.read();
+                }
+
+                return ResponseBody.create(contentType, outStream.toByteArray());
+            } catch (IOException e) {
+                Log.e("RNFetchBlob Error", e.getLocalizedMessage());
+            }
+        }
+        return originalRespBody;
     }
 
     /**
