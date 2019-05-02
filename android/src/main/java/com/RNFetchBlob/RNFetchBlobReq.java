@@ -439,7 +439,8 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
     }
 
     /**
-     * Inflates the response body to full size if the Content-Encoding set to "deflate"
+     * Inflates the response body to full size if the Content-Encoding set to "deflate" since
+     * okhttp3 doesn't handle "deflate" Content-Encoding header.
      * "gzip" Content-Encoding is handled by okhttp3
      */
     private ResponseBody getUncompressedResponseIfNeeded(Response response) {
