@@ -364,7 +364,8 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                         timeout = true;
                         RNFetchBlobUtils.emitWarningEvent("RNFetchBlob error when sending request : " + e.getLocalizedMessage());
                     } catch(Exception ex) {
-                        Log.e("RNFetchBlob error", ex.getLocalizedMessage());
+                        timeout = true;
+                        // Log.e("RNFetchBlob error", ex.getLocalizedMessage());
                     }
                     return chain.proceed(chain.request());
                 }
@@ -461,7 +462,7 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
 
                 return ResponseBody.create(contentType, outStream.toByteArray());
             } catch (IOException e) {
-                Log.e("RNFetchBlob Error", e.getLocalizedMessage());
+                // Log.e("RNFetchBlob Error", e.getLocalizedMessage());
             }
         }
         return originalRespBody;
