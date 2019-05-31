@@ -363,8 +363,8 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                     catch (SocketTimeoutException e ){
                         timeout = true;
                         RNFetchBlobUtils.emitWarningEvent("RNFetchBlob error when sending request : " + e.getLocalizedMessage());
-                    } catch(Exception ex) {
-                        timeout = true;
+                    } 
+                    catch(Exception ex) {
                         // Log.e("RNFetchBlob error", ex.getLocalizedMessage());
                     }
                     return chain.proceed(chain.request());
